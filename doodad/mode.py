@@ -5,6 +5,7 @@ import uuid
 import time
 import base64
 import json
+import pdb
 
 from doodad.slurm.slurm_util import SlurmConfig
 
@@ -327,7 +328,7 @@ class EC2SpotDocker(DockerMode):
         return '%d' % (int(time.time() * 1000))
 
     def launch_command(self, main_cmd, mount_points=None, dry=False,
-                       verbose=False):
+                       verbose=False, sync_include_all=False):
         default_config = dict(
             image_id=self.image_id,
             instance_type=self.instance_type,
@@ -456,17 +457,30 @@ class EC2SpotDocker(DockerMode):
                 mnt_args += ' -v %s:%s' % (ec2_local_dir, mount.mount_point)
 
                 # Sync interval
-                sio.write("""
-                while /bin/true; do
-                    aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
-                    sleep {periodic_sync_interval}
-                done & echo sync initiated
-                """.format(
-                    include_string=mount.include_string,
-                    log_dir=ec2_local_dir,
-                    s3_path=s3_path,
-                    periodic_sync_interval=mount.sync_interval
-                ))
+                if sync_include_all:
+                    sio.write("""
+                    while /bin/true; do
+                        aws s3 sync {log_dir} {s3_path}
+                        sleep {periodic_sync_interval}
+                    done & echo sync initiated
+                    """.format(
+                        # Sync the directory, as well as its contents.
+                        log_dir=ec2_local_dir.rstrip('/'),
+                        s3_path=s3_path,
+                        periodic_sync_interval=mount.sync_interval
+                    ))
+                else:
+                    sio.write("""
+                    while /bin/true; do
+                        aws s3 sync --exclude '*' {include_string} {log_dir} {s3_path}
+                        sleep {periodic_sync_interval}
+                    done & echo sync initiated
+                    """.format(
+                        include_string=mount.include_string,
+                        log_dir=ec2_local_dir,
+                        s3_path=s3_path,
+                        periodic_sync_interval=mount.sync_interval
+                    ))
                 max_sync_interval = max(max_sync_interval, mount.sync_interval)
 
                 # Sync on terminate. This catches the case where the spot
@@ -798,7 +812,7 @@ class GCPDocker(DockerMode):
                                          extra_args=mnt_args,
                                          pythonpath=py_path,
                                          use_docker_generated_name=True)
-
+        
         metadata = {
             'bucket_name': self.gcp_bucket_name,
             'docker_cmd': docker_cmd,
