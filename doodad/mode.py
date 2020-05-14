@@ -464,8 +464,8 @@ class EC2SpotDocker(DockerMode):
                         sleep {periodic_sync_interval}
                     done & echo sync initiated
                     """.format(
-                        # Sync the directory, as well as its contents.
-                        log_dir=ec2_local_dir.rstrip('/'),
+                        # Sync the directory, as well as all of its contents.
+                        log_dir=os.path.dirname(ec2_local_dir),
                         s3_path=s3_path,
                         periodic_sync_interval=mount.sync_interval
                     ))
