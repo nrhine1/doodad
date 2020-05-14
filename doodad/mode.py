@@ -464,7 +464,8 @@ class EC2SpotDocker(DockerMode):
                         sleep {periodic_sync_interval}
                     done & echo sync initiated
                     """.format(
-                        # Sync the directory, as well as all of its contents.
+                        # Sync the *parent* directory, as well as all of its contents. This assumes that the log dir
+                        #  is an only child. We want the name of the logdir included because it may be relevant.
                         log_dir=os.path.dirname(ec2_local_dir),
                         s3_path=s3_path,
                         periodic_sync_interval=mount.sync_interval
